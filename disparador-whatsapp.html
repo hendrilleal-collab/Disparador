@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disparador WhatsApp</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #181818;
+    --border: #252525;
+    --green: #25d366;
+    --green-dark: #128c3e;
+    --green-glow: rgba(37,211,102,0.12);
+    --text: #f0f0f0;
+    --muted: #666;
+    --red: #ff4757;
+    --yellow: #ffc107;
+    --font: 'Syne', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* TOPBAR */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    width: 34px; height: 34px; background: var(--green);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .topbar h1 { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .status-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-family: var(--mono);
+    color: var(--muted); background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: all 0.3s; }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  /* LAYOUT */
+  .wrap { display: grid; grid-template-columns: 360px 1fr; min-height: calc(100vh - 63px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 24px; display: flex; flex-direction: column; gap: 28px;
+    overflow-y: auto; max-height: calc(100vh - 63px);
+  }
+  .block-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 2.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+  }
+
+  label { font-size: 12px; color: var(--muted); font-family: var(--mono); display: block; margin-bottom: 5px; }
+  input, textarea, select {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--mono); font-size: 12.5px;
+    padding: 9px 12px; outline: none; transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus { border-color: var(--green); }
+  input::placeholder, textarea::placeholder { color: #333; }
+  textarea { resize: vertical; line-height: 1.6; }
+
+  .field { margin-bottom: 14px; }
+
+  .tag-hint {
+    background: #0f1f14; border: 1px solid #1a3a22;
+    border-radius: 6px; padding: 8px 10px; margin-top: 8px;
+    font-size: 11px; font-family: var(--mono); color: #4a9a5a; line-height: 1.7;
+  }
+
+  .btn {
+    border: none; cursor: pointer; font-family: var(--font);
+    font-weight: 700; border-radius: 8px; padding: 11px 18px;
+    font-size: 14px; transition: all 0.18s;
+    display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%;
+  }
+  .btn-green { background: var(--green); color: #000; }
+  .btn-green:hover:not(:disabled) { background: #20c05e; transform: translateY(-1px); box-shadow: 0 4px 20px var(--green-glow); }
+  .btn-green:disabled { background: #1a3a22; color: #2a6a3a; cursor: not-allowed; }
+  .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); font-size: 12px; padding: 8px 14px; }
+  .btn-outline:hover { border-color: var(--green); color: var(--green); }
+  .btn-red { background: transparent; color: var(--red); border: 1px solid #2a1111; font-size: 12px; padding: 8px 14px; }
+  .btn-red:hover { background: #1a0a0a; }
+  .btn-row { display: flex; gap: 8px; }
+
+  .delay-row { display: flex; align-items: center; gap: 10px; }
+  .delay-row input { width: 70px; flex-shrink: 0; }
+  .delay-row span { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  /* MAIN */
+  .main { padding: 28px; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; max-height: calc(100vh - 63px); }
+
+  /* CONTACTS TABLE */
+  .contacts-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+  }
+  .contacts-header h2 { font-size: 15px; font-weight: 700; }
+  .counter {
+    font-size: 11px; font-family: var(--mono);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px; color: var(--muted);
+  }
+
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  td { padding: 11px 16px; font-size: 13px; border-bottom: 1px solid #161616; font-family: var(--mono); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #131313; }
+
+  .status-cell { display: flex; align-items: center; gap: 7px; }
+  .badge {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+    border-radius: 4px; padding: 2px 7px; font-family: var(--font);
+  }
+  .badge-wait { background: #1a1a0a; color: var(--yellow); border: 1px solid #2a2a10; }
+  .badge-sending { background: #0a1a1a; color: #00bcd4; border: 1px solid #0a2a2a; }
+  .badge-ok { background: #0a1f0e; color: var(--green); border: 1px solid #0a2a12; }
+  .badge-err { background: #1f0a0a; color: var(--red); border: 1px solid #2a0a0a; }
+
+  .del-btn {
+    background: none; border: none; color: #333; cursor: pointer;
+    font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: color 0.2s;
+  }
+  .del-btn:hover { color: var(--red); }
+
+  /* ADD ROW */
+  .add-row { display: flex; gap: 8px; padding: 12px 16px; background: #0d0d0d; border-top: 1px solid var(--border); }
+  .add-row input { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 7px 10px; outline: none; }
+  .add-row input:focus { border-color: var(--green); }
+  .add-row .inp-name { flex: 1; }
+  .add-row .inp-phone { width: 160px; }
+  .add-row .btn-add { background: var(--green); border: none; color: #000; border-radius: 6px; padding: 7px 14px; font-family: var(--font); font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0; }
+  .add-row .btn-add:hover { background: #20c05e; }
+
+  /* PASTE AREA */
+  .paste-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .paste-section h3 { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .paste-section p { font-size: 12px; color: var(--muted); font-family: var(--mono); margin-bottom: 12px; }
+  .paste-section textarea { height: 90px; font-size: 12px; }
+  .paste-btn-row { display: flex; gap: 8px; margin-top: 10px; }
+
+  /* LOG */
+  .log-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .log-section h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; }
+  .log-box {
+    background: #070707; border: 1px solid #1a1a1a; border-radius: 8px;
+    height: 160px; overflow-y: auto; padding: 12px 14px;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.8;
+  }
+  .log-box .log-ok { color: var(--green); }
+  .log-box .log-err { color: var(--red); }
+  .log-box .log-info { color: #555; }
+  .log-box .log-warn { color: var(--yellow); }
+
+  /* PROGRESS */
+  .progress-bar-wrap { background: #111; border-radius: 4px; height: 6px; margin-top: 14px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.4s; width: 0%; }
+
+  /* STATS ROW */
+  .stats-row { display: flex; gap: 12px; }
+  .stat-card {
+    flex: 1; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .stat-card .stat-num { font-size: 26px; font-weight: 800; line-height: 1; }
+  .stat-card .stat-lbl { font-size: 10px; color: var(--muted); font-family: var(--mono); margin-top: 4px; letter-spacing: 1px; text-transform: uppercase; }
+  .stat-card.green .stat-num { color: var(--green); }
+  .stat-card.red .stat-num { color: var(--red); }
+  .stat-card.yellow .stat-num { color: var(--yellow); }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; font-family: var(--mono); }
+
+  @media (max-width: 800px) {
+    .wrap { grid-template-columns: 1fr; }
+    .sidebar { max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+    .main { max-height: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">💬</div>
+  <h1>Disparador WhatsApp</h1>
+  <div class="topbar-right">
+    <div class="status-badge">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">desconectado</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- CREDENCIAIS -->
+    <div>
+      <div class="block-title">⚙ Credenciais Z-API</div>
+      <div class="field">
+        <label>Instance ID</label>
+        <input type="text" id="instanceId" value="3F37AC0AE7B03143533326D83374930F" />
+      </div>
+      <div class="field">
+        <label>Token</label>
+        <input type="password" id="token" value="8BC0FE06E9232A67CB5F0755" />
+      </div>
+      <button class="btn btn-outline" onclick="testConnection()">🔌 Testar conexão</button>
+    </div>
+
+    <!-- MENSAGEM -->
+    <div>
+      <div class="block-title">✉ Mensagem</div>
+      <div class="field">
+        <label>Template da mensagem</label>
+        <textarea class="template-area" id="msgTemplate" rows="6" placeholder="Ex: Olá {{nome}}! Tenho uma oportunidade incrível de consórcio para você..."></textarea>
+        <div class="tag-hint">
+          Use <strong>{{nome}}</strong> para personalizar com o nome do contato.<br>
+          Ex: "Oi {{nome}}, tudo bem?"
+        </div>
+      </div>
+      <div class="field">
+        <label>Intervalo entre envios</label>
+        <div class="delay-row">
+          <input type="number" id="delay" value="3" min="1" max="60" />
+          <span>segundos entre cada mensagem</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- AÇÕES -->
+    <div>
+      <div class="block-title">▶ Disparar</div>
+      <button class="btn btn-green" id="sendBtn" onclick="startSending()">
+        🚀 Iniciar disparo
+      </button>
+      <div style="margin-top: 8px;">
+        <button class="btn btn-red" id="stopBtn" onclick="stopSending()" style="display:none;">
+          ⏹ Parar disparo
+        </button>
+      </div>
+      <div class="progress-bar-wrap" style="margin-top: 14px;">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div style="margin-top: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); text-align:center;" id="progressText"></div>
+    </div>
+
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-lbl">Total</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-num" id="statOk">0</div>
+        <div class="stat-lbl">Enviados</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-num" id="statErr">0</div>
+        <div class="stat-lbl">Erros</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-num" id="statPending">0</div>
+        <div class="stat-lbl">Pendentes</div>
+      </div>
+    </div>
+
+    <!-- TABELA DE CONTATOS -->
+    <div>
+      <div class="contacts-header">
+        <h2>📋 Lista de contatos</h2>
+        <span class="counter" id="contactCounter">0 contatos</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nome</th>
+              <th>Telefone</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="contactsBody">
+            <tr><td colspan="5"><div class="empty">Nenhum contato adicionado ainda.</div></td></tr>
+          </tbody>
+        </table>
+        <div class="add-row">
+          <input class="inp-name" type="text" id="newName" placeholder="Nome do contato" />
+          <input class="inp-phone" type="text" id="newPhone" placeholder="55119XXXXXXXX" />
+          <button class="btn-add" onclick="addContact()">+ Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLAR LISTA -->
+    <div class="paste-section">
+      <h3>📥 Colar lista de contatos</h3>
+      <p>Cole uma lista no formato: <strong>Nome,Telefone</strong> (um por linha)<br>Ex: João Silva,5511999998888</p>
+      <textarea id="pasteArea" placeholder="João Silva,5511999998888&#10;Maria Souza,5551988887777&#10;Carlos Lima,5541977776666"></textarea>
+      <div class="paste-btn-row">
+        <button class="btn btn-outline" style="width:auto; padding: 8px 16px;" onclick="importPaste()">📋 Importar lista</button>
+        <button class="btn btn-red" style="width:auto; padding: 8px 16px;" onclick="clearAll()">🗑 Limpar tudo</button>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-section">
+      <h3>📟 Log de envios</h3>
+      <div class="log-box" id="logBox">
+        <span class="log-info">» Aguardando início do disparo...</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let contacts = [];
+  let isSending = false;
+  let stopFlag = false;
+
+  // ─── CONEXÃO ───────────────────────────────────────────────────
+  async function testConnection() {
+    const instanceId = document.getElementById('instanceId').value.trim();
+    const token = document.getElementById('token').value.trim();
+    if (!instanceId || !token) { alert('Preencha Instance ID e Token.'); return; }
+
+    log('info', 'Testando conexão com Z-API...');
+    try {
+      const res = await fetch(`https://api.z-api.io/instances/${instanceId}/token/${token}/status`, {
+        method: 'GET', headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.connected || data.status === 'connected' || res.ok) {
+        setStatus(true);
+        log('ok', '✓ Conectado com sucesso!');
+      } else {
+        setStatus(false);
+        log('err', '✗ Não conectado: ' + JSON.stringify(data));
+      }
+    } catch (e) {
+      setStatus(false);
+      log('err', '✗ Erro de conexão: ' + e.message);
+    }
+  }
+
+  function setStatus(on) {
+    document.getElementById('statusDot').className = 'dot' + (on ? ' on' : '');
+    document.getElementById('statusText').textContent = on ? 'conectado' : 'desconectado';
+  }
+
+  // ─── CONTATOS ──────────────────────────────────────────────────
+  function addContact() {
+    const name = document.getElementById('newName').value.trim();
+    const phone = document.getElementById('newPhone').value.trim().replace(/\D/g, '');
+    if (!name || !phone) { alert('Preencha nome e telefone.'); return; }
+    contacts.push({ name, phone, status: 'wait' });
+    document.getElementById('newName').value = '';
+    document.getElementById('newPhone').value = '';
+    renderTable();
+  }
+
+  function deleteContact(i) {
+    contacts.splice(i, 1);
+    renderTable();
+  }
+
+  function clearAll() {
+    if (contacts.length === 0) return;
+    if (!confirm('Limpar todos os contatos?')) return;
+    contacts = [];
+    renderTable();
+  }
+
+  function importPaste() {
+    const raw = document.getElementById('pasteArea').value.trim();
+    if (!raw) { alert('Cole a lista antes de importar.'); return; }
+    const lines = raw.split('\n').filter(l => l.trim());
+    let added = 0;
+    lines.forEach(line => {
+      const parts = line.split(',');
+      if (parts.length >= 2) {
+        const name = parts[0].trim();
+        const phone = parts[1].trim().replace(/\D/g, '');
+        if (name && phone) { contacts.push({ name, phone, status: 'wait' }); added++; }
+      }
+    });
+    document.getElementById('pasteArea').value = '';
+    renderTable();
+    log('info', `» ${added} contatos importados.`);
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('contactsBody');
+    const counter = document.getElementById('contactCounter');
+    counter.textContent = contacts.length + ' contato' + (contacts.length !== 1 ? 's' : '');
+
+    if (contacts.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty">Nenhum contato adicionado ainda.</div></td></tr>';
+      updateStats();
+      return;
+    }
+
+    tbody.innerHTML = contacts.map((c, i) => `
+      <tr>
+        <td style="color:var(--muted)">${i + 1}</td>
+        <td>${c.name}</td>
+        <td>${c.phone}</td>
+        <td>
+          <div class="status-cell">
+            <span class="badge ${statusClass(c.status)}">${statusLabel(c.status)}</span>
+          </div>
+        </td>
+        <td><button class="del-btn" onclick="deleteContact(${i})" title="Remover">✕</button></td>
+      </tr>
+    `).join('');
+    updateStats();
+  }
+
+  function statusClass(s) {
+    return s === 'wait' ? 'badge-wait' : s === 'sending' ? 'badge-sending' : s === 'ok' ? 'badge-ok' : 'badge-err';
+  }
+  function statusLabel(s) {
+    return s === 'wait' ? 'AGUARDANDO' : s === 'sending' ? 'ENVIANDO...' : s === 'ok' ? 'ENVIADO ✓' : 'ERRO ✗';
+  }
+
+  function updateStats() {
+    document.getElementById('statTotal').textContent = contacts.length;
+    document.getElementById('statOk').textContent = contacts.filter(c => c.status === 'ok').length;
+    document.getElementById('statErr').textContent = contacts.filter(c => c.status === 'err').length;
+    document.getElementById('statPending').textContent = contacts.filter(c => c.status === 'wait').length;
+  }
+
+  // ─── DISPARO ───────────────────────────────────────────────────
+  async function startSending() {
+    const instanceId = document.getElementById('instanceId').value.trim();
+    const token = document.getElementById('token').value.trim();
+    const template = document.getElementById('msgTemplate').value.trim();
+    const delay = parseInt(document.getElementById('delay').value) || 3;
+
+    if (!instanceId || !token) { alert('Preencha as credenciais Z-API.'); return; }
+    if (!template) { alert('Escreva a mensagem antes de disparar.'); return; }
+    const pending = contacts.filter(c => c.status === 'wait');
+    if (pending.length === 0) { alert('Nenhum contato pendente para enviar.'); return; }
+
+    isSending = true;
+    stopFlag = false;
+    document.getElementById('sendBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'block';
+
+    log('info', `» Iniciando disparo para ${pending.length} contato(s)...`);
+
+    for (let i = 0; i < contacts.length; i++) {
+      if (stopFlag) { log('warn', '⏹ Disparo interrompido pelo usuário.'); break; }
+      if (contacts[i].status !== 'wait') continue;
+
+      contacts[i].status = 'sending';
+      renderTable();
+      updateProgress(i, contacts.length);
+
+      const msg = template.replace(/\{\{nome\}\}/gi, contacts[i].name);
+      const phone = contacts[i].phone;
+
+      try {
+        const res = await fetch(`https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, message: msg })
+        });
+        const data = await res.json();
+        if (res.ok && (data.zaapId || data.messageId || data.id)) {
+          contacts[i].status = 'ok';
+          log('ok', `✓ Enviado para ${contacts[i].name} (${phone})`);
+        } else {
+          contacts[i].status = 'err';
+          log('err', `✗ Falha para ${contacts[i].name}: ${JSON.stringify(data)}`);
+        }
+      } catch (e) {
+        contacts[i].status = 'err';
+        log('err', `✗ Erro ao enviar para ${contacts[i].name}: ${e.message}`);
+      }
+
+      renderTable();
+
+      if (i < contacts.length - 1 && !stopFlag) {
+        log('info', `» Aguardando ${delay}s...`);
+        await sleep(delay * 1000);
+      }
+    }
+
+    const ok = contacts.filter(c => c.status === 'ok').length;
+    const err = contacts.filter(c => c.status === 'err').length;
+    log('ok', `» Disparo finalizado. ✓ ${ok} enviados, ✗ ${err} erros.`);
+    document.getElementById('sendBtn').style.display = 'block';
+    document.getElementById('stopBtn').style.display = 'none';
+    updateProgress(contacts.length, contacts.length);
+    isSending = false;
+  }
+
+  function stopSending() {
+    stopFlag = true;
+  }
+
+  function updateProgress(done, total) {
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent = total > 0 ? `${done} / ${total} (${pct}%)` : '';
+  }
+
+  // ─── LOG ───────────────────────────────────────────────────────
+  function log(type, msg) {
+    const box = document.getElementById('logBox');
+    const time = new Date().toLocaleTimeString('pt-BR');
+    const line = document.createElement('div');
+    line.className = `log-${type}`;
+    line.textContent = `[${time}] ${msg}`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // Enter para adicionar contato
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (document.activeElement.id === 'newName' || document.activeElement.id === 'newPhone')) {
+      addContact();
+    }
+  });
+</script>
+</body>
+</html>
